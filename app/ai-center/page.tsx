@@ -140,7 +140,7 @@ export default function AICenterPage() {
   const runPrediction = async () => {
     setIsLoadingPrediction(true);
     try {
-      const response = await fetch('/api/ml/predict', {
+      const response = await fetch('/api/ml/predict?v=' + Date.now(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
