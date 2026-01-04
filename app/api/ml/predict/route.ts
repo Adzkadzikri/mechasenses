@@ -77,23 +77,9 @@ export async function POST(request: NextRequest) {
     // Call Python ML service if we have readings
     if (readings.length >= 1) {
       try {
-        console.log(`Calling ML service at ${ML_SERVICE_URL}/predict/both with ${readings.length} readings`);
-        
-        const mlResponse = await fetch(`${ML_SERVICE_URL}/predict/both`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ readings }),
-          signal: AbortSignal.timeout(10000), // 10 second timeout
-        });
-        
-        if (mlResponse.ok) {
-          mlPrediction = await mlResponse.json();
-          console.log('ML prediction successful:', mlPrediction);
-        } else {
-          const errorData = await mlResponse.json().catch(() => ({}));
-          mlServiceError = errorData.detail || `ML service error: ${mlResponse.status}`;
-          console.error('ML service returned error:', mlServiceError);
-        }
+        // Skip ML service call for production/demo
+        console.log('ML service disabled for production - using formula-based prediction only');
+        mlServiceError = 'ML service disabled for production deployment';
       } catch (error) {
         console.error('Error calling ML service:', error);
         mlServiceError = error instanceof Error ? error.message : 'ML service unavailable';
