@@ -137,7 +137,8 @@ export default function AICenterPage() {
   /* =======================
      ML PREDICTION
   ======================= */
-  const runPrediction = async () => {
+  // ML Prediction Component - Updated v2.0
+const runPrediction = async () => {
     setIsLoadingPrediction(true);
     try {
       const response = await fetch('/api/ml/predict?v=' + Date.now(), {
