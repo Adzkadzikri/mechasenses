@@ -11,7 +11,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { calculateHealthScore } from '@/lib/calculateHealthScore';
 
 // ML Service URL
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8001';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
 
 interface VibrationReading {
   vibration_rms: number;
@@ -53,7 +62,7 @@ export async function POST(request: NextRequest) {
       vibrationReadings?: VibrationReading[];
       sensorData?: SensorData;
     };
-    
+
     // Calculate formula-based health score from sensor data
     const healthResult = calculateHealthScore({
       gridVoltage: sensorData?.gridVoltage,
@@ -66,66 +75,92 @@ export async function POST(request: NextRequest) {
       bearingTemp: sensorData?.bearingTemp,
       dustDensity: sensorData?.dustDensity,
     });
-    
+
     // Prepare vibration readings for ML service
     const readings: VibrationReading[] = vibrationReadings || [];
-    
+
     // Default ML response (if service unavailable or no readings)
     let mlPrediction: MLPredictionResponse | null = null;
     let mlServiceError: string | null = null;
-    
-    // Call Python ML service if we have readings
-    if (readings.length >= 1) {
+    let mlServiceStatus: 'available' | 'unavailable' | 'disabled' = 'disabled';
+
+    const canCallMlService =
+      typeof ML_SERVICE_URL === 'string' &&
+      ML_SERVICE_URL.length > 0 &&
+      !isLocalhostUrl(ML_SERVICE_URL);
+
+    if (!canCallMlService) {
+      mlServiceStatus = 'disabled';
+      mlServiceError =
+        'ML service is not configured for this deployment. Set ML_SERVICE_URL to a public URL to enable ML predictions.';
+    } else if (readings.length < 1) {
+      mlServiceStatus = 'unavailable';
+      mlServiceError = 'Not enough vibration readings for ML prediction (need at least 1)';
+    } else {
       try {
-        // Skip ML service call for production/demo
-        console.log('ML service disabled for production - using formula-based prediction only');
-        mlServiceError = 'ML predictions are disabled in this demo. Health scores are calculated using formulas.';
+        console.log(`Calling ML service at ${ML_SERVICE_URL}/predict/both with ${readings.length} readings`);
+
+        const mlResponse = await fetch(`${ML_SERVICE_URL}/predict/both`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ readings }),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (mlResponse.ok) {
+          mlPrediction = await mlResponse.json();
+          mlServiceStatus = 'available';
+        } else {
+          mlServiceStatus = 'unavailable';
+          const errorText = await mlResponse.text().catch(() => '');
+          mlServiceError = errorText || `ML service error: ${mlResponse.status}`;
+        }
       } catch (error) {
         console.error('Error calling ML service:', error);
-        mlServiceError = 'ML predictions are currently unavailable';
+        mlServiceStatus = 'unavailable';
+        mlServiceError = error instanceof Error ? error.message : 'ML service unavailable';
       }
-    } else {
-      mlServiceError = 'ML predictions need vibration data to work properly';
     }
-    
+
     return NextResponse.json({
       success: true,
-      
+
       // Formula-based health score
       healthScore: {
         score: healthResult.score,
         category: healthResult.category,
         factors: healthResult.factors,
       },
-      
+
       // ML predictions (if available)
-      mlPrediction: mlPrediction ? {
-        classification: {
-          willFailSoon: mlPrediction.classification.will_fail_soon,
-          failureProbability: mlPrediction.classification.failure_probability,
-          confidence: mlPrediction.classification.confidence,
-          thresholdMinutes: mlPrediction.classification.threshold_minutes,
-        },
-        regression: {
-          minutesToFailure: mlPrediction.regression.minutes_to_failure,
-          hoursToFailure: mlPrediction.regression.hours_to_failure,
-          status: mlPrediction.regression.status,
-        },
-        readingsUsed: mlPrediction.readings_used,
-      } : null,
-      
+      mlPrediction: mlPrediction
+        ? {
+            classification: {
+              willFailSoon: mlPrediction.classification.will_fail_soon,
+              failureProbability: mlPrediction.classification.failure_probability,
+              confidence: mlPrediction.classification.confidence,
+              thresholdMinutes: mlPrediction.classification.threshold_minutes,
+            },
+            regression: {
+              minutesToFailure: mlPrediction.regression.minutes_to_failure,
+              hoursToFailure: mlPrediction.regression.hours_to_failure,
+              status: mlPrediction.regression.status,
+            },
+            readingsUsed: mlPrediction.readings_used,
+          }
+        : null,
+
       // ML service status
-      mlServiceStatus: mlPrediction ? 'available' : 'unavailable',
+      mlServiceStatus,
       mlServiceError,
-      
+
       timestamp: new Date().toISOString(),
     });
-    
   } catch (error) {
     console.error('Error running prediction:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error', 
+      {
+        error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error',
         success: false,
       },
