@@ -497,7 +497,7 @@ const runPrediction = async () => {
                 <div className="bg-gray-50 p-6 rounded-lg">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">ML Bearing Analysis</h3>
                   
-                  {predictionResult.mlPrediction ? (
+                  {predictionResult?.mlPrediction ? (
                     <div className="space-y-4">
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <div className="flex items-center justify-between mb-2">
@@ -587,7 +587,7 @@ const runPrediction = async () => {
                             vibration_peak_g
                           </span>
                           <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            0.08791
+                            {latestSensorData?.vibrationRms || '0.08791'}
                           </span>
                         </div>
 
