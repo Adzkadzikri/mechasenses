@@ -9,6 +9,34 @@ import { rules } from "@/lib/expert-system/rules";
 import { fuzzyLevelToValue } from "@/lib/expert-system/fuzzyMembership";
 
 /* =======================
+   FIREBASE REAL-TIME LISTENER
+======================= */
+const useFirebaseRealTime = () => {
+  const [latestSensorData, setLatestSensorData] = useState<any>(null);
+  const [isListening, setIsListening] = useState(false);
+
+  useEffect(() => {
+    const database = getDatabase(app);
+    const sensorRef = ref(database, 'sensors/motor1'); // Adjust path as needed
+
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        console.log('🔥 Firebase real-time data received:', data);
+        setLatestSensorData(data);
+        setIsListening(true);
+      }
+    }, (error) => {
+      console.error('❌ Firebase listener error:', error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return { latestSensorData, isListening };
+};
+
+/* =======================
    TYPES
 ======================= */
 interface HealthScoreResult {
@@ -97,8 +125,51 @@ export default function AICenterPage() {
     percent: number;
     label: string;
   } | null>(null);
+
+  /* ===== AUTO ML PREDICTION ===== */
+  const runAutoMLPrediction = async (sensorData: any) => {
+    console.log('🤖 Running auto ML prediction with:', sensorData);
+    
+    try {
+      setIsLoadingPrediction(true);
+      
+      const response = await fetch('/api/ml/predict?' + Date.now(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sensorData: {
+            vibration_peak_g: sensorData.vibration_peak_g || sensorData.vibration_rms_mm_s,
+            voltage: sensorData.voltage,
+            power: sensorData.power,
+            pf: sensorData.pf,
+            motor_temp: sensorData.motor_temp,
+            health_index: sensorData.health_index,
+          }
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setPredictionResult(result);
+        console.log('✅ Auto ML prediction completed:', result);
+      }
+    } catch (error) {
+      console.error('❌ Auto ML prediction error:', error);
+      // Set fallback result
+      setPredictionResult({
+        healthScore: { score: 85, category: 'Excellent', factors: [] },
+        mlPrediction: null,
+        mlServiceStatus: 'unavailable',
+        mlServiceError: 'Auto prediction unavailable',
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setIsLoadingPrediction(false);
+    }
+  };
   
-  // Listen to Firebase for vibration history and sensor data
+  // Listen to Firebase for real-time sensor data and auto-run ML prediction
   useEffect(() => {
     const db = getDatabase(app);
     const sensorRef = ref(db, 'sensor_data/latest');
@@ -106,6 +177,9 @@ export default function AICenterPage() {
     const unsubscribe = onValue(sensorRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
+        console.log('🔥 Firebase real-time data received:', data);
+        
+        // Update sensor data state
         setLatestSensorData({
           gridVoltage: data.voltage,
           motorCurrent: data.current,
@@ -118,6 +192,7 @@ export default function AICenterPage() {
           dustDensity: data.dust,
         });
         
+        // Update vibration history
         if (data.vibration_rms_mm_s !== undefined) {
           setVibrationHistory(prev => {
             const newReading = {
@@ -128,7 +203,15 @@ export default function AICenterPage() {
             return updated;
           });
         }
+        
+        // 🚀 AUTO-RUN ML PREDICTION ON NEW DATA
+        if (data.vibration_peak_g || data.vibration_rms_mm_s) {
+          console.log('🤖 Auto-triggering ML prediction...');
+          runAutoMLPrediction(data);
+        }
       }
+    }, (error) => {
+      console.error('❌ Firebase listener error:', error);
     });
     
     return () => unsubscribe();
@@ -301,11 +384,27 @@ const runPrediction = async () => {
           <h1 className="text-3xl font-bold text-gray-800">AI Center</h1>
           <p className="text-gray-600 mt-1">Bearing Failure Prediction & Motor Health Analysis</p>
           
-          <div className="mt-2 flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${vibrationHistory.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-            <span className="text-sm text-gray-600">
-              {vibrationHistory.length} vibration readings collected
-            </span>
+          <div className="mt-2 flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${vibrationHistory.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-600">
+                {vibrationHistory.length} vibration readings collected
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${latestSensorData ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-600">
+                {latestSensorData ? '🔥 Firebase connected' : 'Waiting for Firebase data...'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isLoadingPrediction ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isLoadingPrediction ? '🤖 ML predicting...' : 'ML ready'}
+              </span>
+            </div>
           </div>
         </div>
         
