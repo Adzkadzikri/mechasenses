@@ -157,6 +157,14 @@ export default function AICenterPage() {
       }
     } catch (error) {
       console.error('Error running prediction:', error);
+      // Set a user-friendly error message
+      setPredictionResult({
+        healthScore: { score: 0, category: 'Healthy', factors: [] },
+        mlPrediction: null,
+        mlServiceStatus: 'unavailable',
+        mlServiceError: 'ML predictions are currently unavailable. Health scores are calculated using formulas.',
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setIsLoadingPrediction(false);
     }
