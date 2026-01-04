@@ -79,13 +79,13 @@ export async function POST(request: NextRequest) {
       try {
         // Skip ML service call for production/demo
         console.log('ML service disabled for production - using formula-based prediction only');
-        mlServiceError = 'ML service disabled for production deployment';
+        mlServiceError = 'ML predictions are disabled in this demo. Health scores are calculated using formulas.';
       } catch (error) {
         console.error('Error calling ML service:', error);
-        mlServiceError = error instanceof Error ? error.message : 'ML service unavailable';
+        mlServiceError = 'ML predictions are currently unavailable';
       }
     } else {
-      mlServiceError = 'Not enough vibration readings for ML prediction (need at least 1)';
+      mlServiceError = 'ML predictions need vibration data to work properly';
     }
     
     return NextResponse.json({
