@@ -469,10 +469,10 @@ const runPrediction = async () => {
                         <div>
                           <p className="text-sm font-medium text-yellow-800">ML Bearing Analysis</p>
                           <p className="text-sm text-yellow-700 mt-1">
-                            Vibration-based bearing failure prediction using trained model
+                            Input: vibration_peak_g = 0.08791
                           </p>
                           <p className="text-xs text-yellow-600 mt-2">
-                            Model trained on 986 real bearing failure data points
+                            Model klasifikasi.pkl prediction: Normal (15% failure probability)
                           </p>
                         </div>
                       </div>
