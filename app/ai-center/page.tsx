@@ -497,6 +497,15 @@ const runPrediction = async () => {
                 <div className="bg-gray-50 p-6 rounded-lg">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">ML Bearing Analysis</h3>
                   
+                  {/* Debug: Show predictionResult state */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+                      <p>predictionResult: {predictionResult ? 'exists' : 'null'}</p>
+                      <p>mlPrediction: {predictionResult?.mlPrediction ? 'exists' : 'null'}</p>
+                      <p>isLoading: {isLoadingPrediction ? 'true' : 'false'}</p>
+                    </div>
+                  )}
+                  
                   {predictionResult?.mlPrediction ? (
                     <div className="space-y-4">
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
@@ -568,6 +577,11 @@ const runPrediction = async () => {
                       <p className="text-xs text-gray-400 mt-1">
                         Using klasifikasi.pkl and prediksi.pkl models
                       </p>
+                      {predictionResult && !predictionResult.mlPrediction && (
+                        <p className="text-xs text-red-500 mt-2">
+                          Error: mlPrediction is null in response
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

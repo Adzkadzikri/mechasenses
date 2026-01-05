@@ -141,6 +141,8 @@ export async function POST(request: NextRequest) {
           timestamp: new Date().toISOString(),
           readings_used: 1
         };
+        
+        console.log('✅ ML Prediction created:', mlPrediction);
       }
     } else if (readings.length < 1) {
       mlServiceStatus = 'unavailable';
